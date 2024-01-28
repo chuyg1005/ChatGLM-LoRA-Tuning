@@ -7,6 +7,7 @@ from dataset import load_data, NerCollate
 from transformers import AutoModel, AutoTokenizer
 from config_utils import ConfigParser
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
+import numpy as np
 
 data_name = "msra"
 
@@ -20,7 +21,7 @@ args = config_parser.parse_main()
 model = AutoModel.from_pretrained(args.model_dir, trust_remote_code=True)
 tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=True)
 model.eval()
-model = PeftModel.from_pretrained(model, os.path.join(args.save_dir, "adapter_model"), torch_dtype=torch.float32, trust_remote_code=True)
+model = PeftModel.from_pretrained(model,  args.save_dir, torch_dtype=torch.float32, trust_remote_code=True)
 model.half().cuda()
 model.eval()
 
@@ -52,6 +53,7 @@ with torch.no_grad():
         for k,v in batch.items():
             batch[k] = v.cuda()
         labels = batch["labels"].detach().cpu().numpy()
+        # print(batch)
 
         output = model(**batch)
         logits = output.logits

@@ -8,9 +8,10 @@ from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
 data_name = "msra"
 
-train_args_path = "./checkpoint/{}/train_trainer/adapter_model/train_args.json".format(data_name)
+train_args_path = "./checkpoint/{}/train_deepspeed/adapter_model/train_args.json".format(data_name)
 with open(train_args_path, "r") as fp:
     args = json.load(fp)
+    print(args)
 
 
 config = AutoConfig.from_pretrained(args["model_dir"], trust_remote_code=True)
@@ -19,12 +20,12 @@ tokenizer = AutoTokenizer.from_pretrained(args["model_dir"],  trust_remote_code=
 
 model = AutoModel.from_pretrained(args["model_dir"],  trust_remote_code=True).half().cuda()
 model = model.eval()
-model = PeftModel.from_pretrained(model, os.path.join(args["save_dir"], "adapter_model"), torch_dtype=torch.float32, trust_remote_code=True)
+model = PeftModel.from_pretrained(model, os.path.join(args["save_dir"]), torch_dtype=torch.float32, trust_remote_code=True)
 model.half().cuda()
 model.eval()
 
 while True:
     inp = input("用户 >>> ")
     response, history = model.chat(tokenizer, inp, history=[])
-    print("ChatNER >>> ", response))
+    print("ChatNER >>> ", response)
     print("="*100)

@@ -13,6 +13,7 @@ from dataset import load_data, NerCollate
 from config_utils import ConfigParser
 from transformers import AutoModelForSeq2SeqLM
 from transformers import AutoTokenizer
+import argparse
 
 from peft import (
     LoraConfig,
@@ -39,20 +40,21 @@ def print_trainable_parameters(model):
 
 def main():
     args = {
-        "data_name": "msra",
-        "model_dir": "/root/autodl-tmp/chatglm-6b/",
+        "data_dir": "en",
+        "data_name": 'mixre',
+        "model_dir": "./model_hub/chatglm2-6b-32k",
         "lora_r": 8,
-        "max_source_length": 128,
+        "max_source_length": 512,
         "max_target_length": 32,
         "instruct_column": "instruct",
         "query_column": "query",
         "response_column": "answer",
-        "train_path": "data/msra/instruct_data/train.txt",
-        "dev_path": "data/msra/instruct_data/dev.txt",
+        "train_path": "data/mixre/instruct_data/{}/train.txt",
+        "dev_path": "data/mixre/instruct_data/{}/dev.txt",
         "ignore_pad_token_for_loss": True,
-        "train_batch_size": 12,
-        "gradient_accumulation_steps": 1,
-        "save_dir": "./checkpoint/msra/train_deepspeed/adapter_model/",
+        "train_batch_size": 2,
+        "gradient_accumulation_steps": 2,
+        "save_dir": "./checkpoint/mixre/train_deepspeed/{}/chatglm2-6b-32k/",
         "num_train_epochs": 1,
         "local_rank": -1,
         "log_steps": 10,
@@ -60,7 +62,11 @@ def main():
     }
 
     config_parser = ConfigParser(args)
-    args = config_parser.parse_main()
+    args = config_parser.parse_main()  # 从命令行替换
+
+    args.train_path = args.train_path.format(args.data_dir)
+    args.dev_path = args.dev_path.format(args.data_dir)
+    args.save_dir = args.save_dir.format(args.data_dir)
 
     pprint(vars(args))
 
@@ -71,8 +77,7 @@ def main():
         json.dump(vars(args), fp, ensure_ascii=False, indent=2)
 
     model = AutoModelForSeq2SeqLM.from_pretrained(args.model_dir,
-                                                  trust_remote_code=True,
-                                                  )
+                                                  trust_remote_code=True)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_dir, trust_remote_code=True)
 
@@ -102,7 +107,7 @@ def main():
                     "weight_decay": 5e-4
                 }
             },
-            "fp16": {
+            "bf16": {
                 "enabled": True
             },
             "zero_optimization": {
@@ -139,7 +144,8 @@ def main():
                                                          model=model,
                                                          model_parameters=model.parameters())
     model_engine.train()
-    total_step = int(len(train_dataloader) * args.num_train_epochs / conf["gradient_accumulation_steps"])
+    gradient_accumulation_steps = conf["gradient_accumulation_steps"]
+    total_step = int(len(train_dataloader) * args.num_train_epochs / gradient_accumulation_steps)
     global_step = 0
     for i_epoch in range(args.num_train_epochs):
         train_iter = iter(train_dataloader)
@@ -156,15 +162,14 @@ def main():
             if (step + 1) % conf["gradient_accumulation_steps"] == 0:
                 model_engine.step()
                 global_step += 1
-            if global_step % args.log_steps == 0:
-                print("loss:{}, global_step:{}/{}".format(float(loss.item()), global_step, total_step))
-            if global_step % args.save_steps == 0:
-                # save_dir = os.path.join(args.output_dir, f"global_step-{global_step}")
-                model_engine.save_pretrained(args.save_dir)
-                # copy(os.path.join(args.model_dir, "tokenizer_config.json"), os.path.join(args.save_dir, "tokenizer_config.json"))
-                # copy(os.path.join(args.model_dir, "ice_text.model"), os.path.join(args.save_dir, "ice_text.model"))
+                if global_step % args.log_steps == 0:
+                    print("loss:{}, global_step:{}/{}".format(float(loss.item()), global_step, total_step))
+                if global_step % args.save_steps == 0:
+                    # save_dir = os.path.join(args.output_dir, f"global_step-{global_step}")
+                    model_engine.save_pretrained(args.save_dir)
+                    # copy(os.path.join(args.model_dir, "tokenizer_config.json"), os.path.join(args.save_dir, "tokenizer_config.json"))
+                    # copy(os.path.join(args.model_dir, "ice_text.model"), os.path.join(args.save_dir, "ice_text.model"))
 
 
 if __name__ == "__main__":
     main()
-
