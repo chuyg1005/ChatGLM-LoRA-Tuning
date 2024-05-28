@@ -38,7 +38,7 @@ def extract_triples_with_sent_ids(item, sent_ids):
 
 def process_item(item, lang, split='train'):
     """处理单个item"""
-    if lang == 'zh':
+    if lang[:2] in {'zh', 'jp'}:
         sents = [''.join(sent) for sent in item['sents']]
     else:
         sents = [' '.join(sent) for sent in item['sents']]
@@ -65,7 +65,7 @@ def process_item(item, lang, split='train'):
             query = f"Now the given sentence is: {paragraph}\n"
             triples = extract_triples_with_sent_ids(item, sent_ids)
             entities = ','.join(['\t'.join([triple[0], triple[2]]) for triple in triples])
-            query += "Now the given entities are: {}\n".format(entities)
+            query += "Now the given entity pairs are: {}\n".format(entities)
             query += "You should direct output relation triples like 'head_entity\trelation\ttail_entity', and multiple triples are separated by '\n'"
 
             answer = '\n'.join([f"{triple[0]}\t{triple[1]}\t{triple[2]}" for triple in triples])

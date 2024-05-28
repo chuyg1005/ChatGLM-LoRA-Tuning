@@ -2,22 +2,18 @@ import os
 import json
 import torch
 import deepspeed
-import argparse
 
-from shutil import copy
 from pprint import pprint
-from transformers import AutoModelForCausalLM
-from transformers import AutoTokenizer
 from torch.utils.data import RandomSampler, DataLoader
 from dataset import load_data, NerCollate
 from config_utils import ConfigParser
 from transformers import AutoModelForSeq2SeqLM
 from transformers import AutoTokenizer
-import argparse
 
 from peft import (
     LoraConfig,
     get_peft_model,
+    PeftModel,
     get_peft_model_state_dict,
     set_peft_model_state_dict,
 )
@@ -40,7 +36,7 @@ def print_trainable_parameters(model):
 
 def main():
     args = {
-        "data_dir": "en",
+        "task_dir": "en",
         "data_name": 'mixre',
         "model_dir": "./model_hub/chatglm2-6b-32k",
         "lora_r": 8,
@@ -49,12 +45,14 @@ def main():
         "instruct_column": "instruct",
         "query_column": "query",
         "response_column": "answer",
-        "train_path": "data/mixre/instruct_data/{}/train.txt",
-        "dev_path": "data/mixre/instruct_data/{}/dev.txt",
+        "train_path": "data/{}/instruct_data/{}/train.txt",
+        "dev_path": "data/{}/instruct_data/{}/dev.txt",
         "ignore_pad_token_for_loss": True,
         "train_batch_size": 2,
         "gradient_accumulation_steps": 2,
-        "save_dir": "./checkpoint/mixre/train_deepspeed/{}/chatglm2-6b-32k/",
+        "save_dir_tpl": "./checkpoint/{}/train_deepspeed/{}/chatglm2-6b-32k/",
+        "save_dir": "",
+        "pretrain_dir": None,
         "num_train_epochs": 1,
         "local_rank": -1,
         "log_steps": 10,
@@ -64,9 +62,15 @@ def main():
     config_parser = ConfigParser(args)
     args = config_parser.parse_main()  # 从命令行替换
 
-    args.train_path = args.train_path.format(args.data_dir)
-    args.dev_path = args.dev_path.format(args.data_dir)
-    args.save_dir = args.save_dir.format(args.data_dir)
+    args.train_path = args.train_path.format(args.data_name, args.task_dir)
+    args.dev_path = args.dev_path.format(args.data_name, args.task_dir)
+    checkpoint_dir = None
+    if args.pretrain_dir is None:
+        args.save_dir = args.save_dir_tpl.format(args.data_name, args.task_dir)
+    else:
+        args.save_dir = args.save_dir_tpl.format(args.data_name, f"{args.pretrain_dir}##{args.task_dir}")
+        checkpoint_dir = args.save_dir_tpl.format(args.data_name, args.pretrain_dir)
+
 
     pprint(vars(args))
 
@@ -90,7 +94,16 @@ def main():
                         inference_mode=False,
                         )
 
-    model = get_peft_model(model, config)
+    # 此处后续需要支持加载ckpt
+    if checkpoint_dir is None:
+        print("initialize from scratch.")
+        model = get_peft_model(model, config)
+    else:
+        if not os.path.exists(checkpoint_dir):
+            raise ValueError(f"pretrain path {checkpoint_dir} not exists")
+        print("loading from pretrain path.")
+        model = PeftModel.from_pretrained(model, checkpoint_dir, torch_dtype=torch.float32,
+                                          trust_remote_code=True)
     model = model.cuda()
 
     conf = {"train_micro_batch_size_per_gpu": args.train_batch_size,
@@ -125,6 +138,9 @@ def main():
             },
             "steps_per_print": args.log_steps
             }
+    for name, param in model.named_parameters():
+        if 'lora' in name:
+            param.requires_grad = True
 
     print_trainable_parameters(model)
 

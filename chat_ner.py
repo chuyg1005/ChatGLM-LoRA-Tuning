@@ -2,7 +2,6 @@ import os
 import torch
 import json
 from pprint import pprint
-from accelerate import infer_auto_device_map, init_empty_weights, load_checkpoint_and_dispatch
 from transformers import AutoTokenizer, AutoModel, AutoConfig
 from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 
