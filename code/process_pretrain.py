@@ -1,8 +1,6 @@
 import json
 import argparse
 import os
-from tqdm import tqdm
-from hashlib import md5
 
 
 def load_data(path):

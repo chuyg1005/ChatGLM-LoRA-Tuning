@@ -40,7 +40,7 @@ def process_msra(in_file, out_file, mode=""):
 
   if mode == "train":
     print("有实体的数据：", len(has_entity))
-    print("没尸体的数据：", len(no_entity))
+    print("没实体的数据：", len(no_entity))
     # train_data = has_entity[:2000] + no_entity[:500]
     train_data = has_entity + no_entity
     print(train_data[0])

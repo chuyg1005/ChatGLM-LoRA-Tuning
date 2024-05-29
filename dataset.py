@@ -1,6 +1,6 @@
 import torch
 import json
-from torch.utils.data import Dataset
+from transformers import AutoTokenizer
 
 
 def load_data(path):
@@ -24,10 +24,10 @@ class NerCollate:
         self.max_source_length = args.max_source_length
         self.max_target_length = args.max_target_length
         self.instruct_column = args.instruct_column
-        self.query_column = args.query_column
-        self.response_column = args.response_column
+        self.query_column = args.query_column # "query"
+        self.response_column = args.response_column # "answer"
         self.ignore_pad_token_for_loss = args.ignore_pad_token_for_loss
-        self.history_column = None
+        self.history_column = None # "history"
         self.tokenizer = tokenizer
         self.max_seq_length = self.max_source_length + self.max_target_length
 
@@ -59,6 +59,7 @@ class NerCollate:
 
                 # print_dataset_example(a_ids, b_ids, self.tokenizer)
 
+                # 截断超过长度的输入
                 if len(a_ids) > self.max_source_length - 1:
                     a_ids = a_ids[: self.max_source_length - 1]
 
@@ -101,29 +102,18 @@ if __name__ == "__main__":
         response_column = "answer"
         ignore_pad_token_for_loss = True
         train_path = "data/msra/instruct_data/train.txt"
+        model_name = 'THUDM/chatglm-6b-int4'
 
 
     args = Args()
-    from transformers import AutoTokenizer, AutoModel
 
-    tokenizer = AutoTokenizer.from_pretrained("THUDM/chatglm-6b-int4", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+    batch_size = 8
     data = load_data(args.train_path)
     print(data[0])
 
+    batch_data = data[:batch_size]
     ner_collate = NerCollate(args, tokenizer)
 
-    # from torch.utils.data import DataLoader
-    # train_dataloader = DataLoader(data,
-    #                 batch_size=1,
-    #                 shuffle=False,
-    #                 drop_last=True,
-    #                 num_workers=0,
-    #                 collate_fn=ner_collate.collate_fn)
-    # for step, batch in enumerate(train_dataloader):
-    #   input_ids = batch["input_ids"]
-    #   labels = batch["labels"]
-    #   print(input_ids.shape, labels.shape)
-    #   break
-
-    train_dataset = ner_collate.collate_fn(data)
-    print(train_dataset["input_ids"][0])
+    batch_data = ner_collate.collate_fn(batch_data)
+    print(batch_data["input_ids"][0])
