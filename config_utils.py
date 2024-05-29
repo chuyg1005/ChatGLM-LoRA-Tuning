@@ -9,7 +9,7 @@ class ConfigParser:
         self.config = config
         assert isinstance(config, dict)
         args = sys.argv
-        args = args[1:]
+        args = args[1:] # 获取命令行参数列表
         print(args)
         self.args = args
 

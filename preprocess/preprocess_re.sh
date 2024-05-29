@@ -3,5 +3,5 @@
 #done
 
 for data_dir in 'mix-30-3k' 'mix-50-3k' 'mix-70-3k' 'inter-sent-50' 'intra-sent-50' 'entity-50'; do
-  python code/process_re.py --data_dir ./data/mixre/data/$data_dir --save_dir ./data/mixre/instruct_data/$data_dir --lang en
+  python preprocess/process_re.py --data_dir ./data/mixre/data/$data_dir --save_dir ./data/mixre/instruct_data/$data_dir --lang en
 done
